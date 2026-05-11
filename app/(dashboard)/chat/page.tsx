@@ -8,6 +8,12 @@ import '@/styles/nexley-chat.css';
 
 export const metadata: Metadata = { title: 'Chat | Nexley AI' };
 
+// ── Temporary kill-switch ────────────────────────────────────────────
+// Set to false to bring the dashboard chat back online. Renders a
+// maintenance card in place of the chat UI. Composer + Realtime + the
+// VPS bridges are all bypassed while this is true.
+const CHAT_TEMPORARILY_DISABLED = true;
+
 interface ChatPageProps {
   searchParams: Promise<{ client?: string }>;
 }
@@ -21,6 +27,22 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
 
   const session = getUserSession(user);
   const { client: queryClientId } = await searchParams;
+
+  if (CHAT_TEMPORARILY_DISABLED) {
+    return (
+      <div className="max-w-2xl mx-auto mt-16 px-6">
+        <div className="rounded-lg border border-border bg-card p-8 text-center">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground mb-2">
+            Chat temporarily down
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            The dashboard chat is paused for maintenance. We&apos;ll have it back online shortly —
+            in the meantime, message your AI Employee on WhatsApp.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Which client are we chatting as? ─────────────────────────────
   // owner/member: always their assigned client_id.
