@@ -3,6 +3,15 @@ import { authenticateAgentRequest } from '@/lib/api-auth'
 import { sendSms } from '@/lib/twilio'
 
 export async function POST(request: Request) {
+  // 2026-05-12 — Twilio no longer in use. Hard-gate before any auth or parse work.
+  // sendSms also self-gates (defence in depth).
+  if (process.env.TWILIO_ENABLED !== '1') {
+    return NextResponse.json(
+      { error: 'SMS is currently disabled' },
+      { status: 410 },
+    )
+  }
+
   let body: Record<string, unknown>
   try {
     body = await request.json()

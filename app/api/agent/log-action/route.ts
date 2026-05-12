@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { authenticateAgentRequest } from '@/lib/api-auth'
 
 function service() {
   return createClient(
@@ -64,27 +65,19 @@ type Payload = {
 }
 
 export async function POST(req: NextRequest) {
-  // Auth — agent_api_key, accept both Authorization: Bearer oak_... and
-  // x-api-key: oak_... (see api-auth.ts) so VPS agents can use a single
-  // header convention across every /api/agent/* endpoint.
-  const bearer = (req.headers.get('authorization') || '').match(/^Bearer\s+(oak_[a-f0-9]+)$/i)
-  const xkey = (req.headers.get('x-api-key') || '').match(/^(oak_[a-f0-9]+)$/i)
-  const match = bearer ?? xkey
-  if (!match) {
-    return NextResponse.json({ error: 'Missing or malformed agent key (Authorization: Bearer or x-api-key)' }, { status: 401 })
+  // 2026-05-12 (security audit C2) — use the central authenticateAgentRequest
+  // helper from lib/api-auth.ts so this endpoint participates in the 3-tier
+  // hash chain (current key → previous key during rotation window → legacy
+  // plaintext with self-heal). Previous manual `.eq('agent_api_key', ...)`
+  // lookup skipped the chain — leaked-key revocation lagged by the rotation
+  // grace window. The helper accepts both `Authorization: Bearer` and
+  // `x-api-key` headers (same shape as before).
+  const auth = await authenticateAgentRequest(req)
+  if (!auth.authenticated) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
   }
-  const apiKey = match[1]
-
+  const cfg = { client_id: auth.clientId }
   const supabase = service()
-  const { data: cfg, error: cfgErr } = await supabase
-    .from('agent_config')
-    .select('client_id')
-    .eq('agent_api_key', apiKey)
-    .maybeSingle()
-
-  if (cfgErr || !cfg?.client_id) {
-    return NextResponse.json({ error: 'Unknown agent key' }, { status: 401 })
-  }
 
   let body: Payload
   try {

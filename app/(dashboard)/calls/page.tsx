@@ -306,24 +306,12 @@ function ExpandedDetail({ call }: { call: CallLog }) {
   const [sending, setSending] = useState(false)
 
   async function sendSms() {
-    if (!call.from_number || !smsText.trim()) return
-    setSending(true)
-    try {
-      const res = await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: call.from_number, body: smsText.trim() }),
-      })
-      const data = await res.json() as { success?: boolean; error?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Failed to send')
-      toast.success('SMS sent')
-      setSmsText('')
-      setShowSms(false)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to send SMS')
-    } finally {
-      setSending(false)
-    }
+    // 2026-05-12 — Twilio no longer in use. SMS path is gated server-side and
+    // would return 410; surface a clean message instead of letting the user
+    // hit it. The calls page is moribund anyway (voice channel dead since
+    // 2026-05-05); whole component is a candidate for deletion.
+    toast.error('SMS is currently disabled — message the customer on WhatsApp instead.')
+    setShowSms(false)
   }
 
   return (

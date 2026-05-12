@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { authenticateAgentRequest } from '@/lib/api-auth'
 
 function service() {
   return createClient(
@@ -34,19 +35,15 @@ type Payload = {
 }
 
 export async function POST(req: NextRequest) {
-  // Accept both Authorization: Bearer oak_... and x-api-key: oak_... (see api-auth.ts).
-  const bearer = (req.headers.get('authorization') || '').match(/^Bearer\s+(oak_[a-f0-9]+)$/i)
-  const xkey = (req.headers.get('x-api-key') || '').match(/^(oak_[a-f0-9]+)$/i)
-  const m = bearer ?? xkey
-  if (!m) return NextResponse.json({ error: 'Missing agent bearer' }, { status: 401 })
-
+  // 2026-05-12 (security audit C2) — use authenticateAgentRequest for hash-
+  // chain lookup (current → previous → legacy plaintext with self-heal).
+  // See log-action/route.ts for rationale.
+  const auth = await authenticateAgentRequest(req)
+  if (!auth.authenticated) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status })
+  }
+  const cfg = { client_id: auth.clientId }
   const supabase = service()
-  const { data: cfg } = await supabase
-    .from('agent_config')
-    .select('client_id')
-    .eq('agent_api_key', m[1])
-    .maybeSingle()
-  if (!cfg?.client_id) return NextResponse.json({ error: 'Unknown agent key' }, { status: 401 })
 
   let body: Payload
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }

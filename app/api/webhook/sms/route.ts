@@ -4,6 +4,7 @@ import {
   getOrCreateContact,
 } from "@/lib/conversation";
 import { getSupabase } from "@/lib/supabase";
+import { validateTwilioSignature } from "@/lib/twilio";
 
 // Save-only webhook: stores inbound SMS to Supabase for async processing.
 // The Mac Mini sms-responder (Claude Code on Max plan) handles AI replies.
@@ -11,28 +12,63 @@ import { getSupabase } from "@/lib/supabase";
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
-  // Validate Twilio webhook authenticity via shared secret
-  const twilioWebhookSecret = process.env.TWILIO_WEBHOOK_SECRET || process.env.INTERNAL_API_KEY;
-  if (twilioWebhookSecret) {
-    const providedSecret = req.headers.get('x-twilio-webhook-secret');
-    if (providedSecret !== twilioWebhookSecret) {
-      console.error('[sms-webhook] Invalid or missing x-twilio-webhook-secret header');
+  // 2026-05-12 — Twilio no longer in use. Gate behind explicit opt-in so a
+  // leaked secret can't forge inbounds. Re-enable with TWILIO_ENABLED=1.
+  if (process.env.TWILIO_ENABLED !== '1') {
+    console.warn('[sms-webhook] disabled (TWILIO_ENABLED!=1) — returning 410');
+    return new Response('<Response></Response>', {
+      status: 410,
+      headers: { 'Content-Type': 'text/xml' },
+    });
+  }
+
+  // 2026-05-12 (security audit C1+M3) — Twilio HMAC-SHA1 signature, the
+  // standard TwiML webhook validation mechanism. Dual-accept window:
+  // TWILIO_HMAC_DUAL_ACCEPT=1 → fall back to legacy shared-secret with warn
+  // (72h soak), then unset to enforce HMAC only.
+  const formData = await req.formData();
+  const formParams: Record<string, string> = {};
+  formData.forEach((v, k) => {
+    if (typeof v === "string") formParams[k] = v;
+  });
+
+  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioSignature = req.headers.get("x-twilio-signature");
+  const fullUrl = new URL(req.url).toString();
+  const hmacOk = !!twilioAuthToken && validateTwilioSignature(
+    twilioAuthToken,
+    twilioSignature,
+    fullUrl,
+    formParams,
+  );
+
+  if (!hmacOk) {
+    const dualAccept = process.env.TWILIO_HMAC_DUAL_ACCEPT === "1";
+    const legacySecret = process.env.TWILIO_WEBHOOK_SECRET;
+    const provided = req.headers.get("x-twilio-webhook-secret");
+    if (dualAccept && legacySecret && provided === legacySecret) {
+      console.warn(
+        "[sms-webhook][twilio-auth] legacy shared-secret used — migrate to X-Twilio-Signature HMAC (will be removed after 72h clean)",
+      );
+    } else if (!twilioAuthToken) {
+      console.error("[sms-webhook] TWILIO_AUTH_TOKEN not configured — cannot validate HMAC");
+      return new Response("<Response></Response>", {
+        status: 500,
+        headers: { "Content-Type": "text/xml" },
+      });
+    } else {
+      console.error(
+        "[sms-webhook] HMAC validation failed — rejecting (sig-present=" +
+          !!twilioSignature + ", dual-accept=" + dualAccept + ")",
+      );
       return new Response("<Response></Response>", {
         status: 403,
         headers: { "Content-Type": "text/xml" },
       });
     }
-  } else {
-    console.error('[sms-webhook] No TWILIO_WEBHOOK_SECRET or INTERNAL_API_KEY configured — rejecting request');
-    return new Response("<Response></Response>", {
-      status: 500,
-      headers: { "Content-Type": "text/xml" },
-    });
   }
 
   try {
-    // Twilio sends form-encoded data for SMS
-    const formData = await req.formData();
     const from = (formData.get("From") as string) || "";
     const to = (formData.get("To") as string) || "";
     const body = (formData.get("Body") as string) || "";

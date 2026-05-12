@@ -1,7 +1,49 @@
 /** Twilio SMS helper — sends SMS and logs to comms_log */
 
 import { createClient } from '@supabase/supabase-js'
+import { createHmac } from 'crypto'
 import { normalizePhone } from '@/lib/phone'
+
+/**
+ * Validate a Twilio webhook request via the `X-Twilio-Signature` header.
+ *
+ * Twilio's algorithm (TwiML webhook security):
+ *   1. Take the full request URL the webhook hit (including query string).
+ *   2. Append every form-POST parameter, sorted alphabetically by key,
+ *      concatenated as `${key}${value}` with no separators.
+ *   3. HMAC-SHA1 the result with the account's auth token.
+ *   4. Base64-encode and compare timing-safely against `X-Twilio-Signature`.
+ *
+ * Returns true iff the signature matches. Never throws.
+ *
+ * Added 2026-05-12 (security audit C1). The previous shared-secret string-
+ * compare on `x-twilio-webhook-secret` was non-standard and weaker than
+ * Twilio's intended HMAC mechanism. Dual-accept rollout: routes check this
+ * first, fall back to the shared-secret with a deprecation warn for 72h,
+ * then drop the fallback once the legacy-warn log is clean.
+ */
+export function validateTwilioSignature(
+  authToken: string,
+  signatureHeader: string | null,
+  fullUrl: string,
+  formParams: Record<string, string>,
+): boolean {
+  try {
+    if (!authToken || !signatureHeader) return false
+    const sortedKeys = Object.keys(formParams).sort()
+    const data = fullUrl + sortedKeys.map((k) => `${k}${formParams[k]}`).join('')
+    const expected = createHmac('sha1', authToken).update(data, 'utf8').digest('base64')
+    if (expected.length !== signatureHeader.length) return false
+    // Timing-safe compare — avoids leaking bytes via early-exit string match.
+    let mismatch = 0
+    for (let i = 0; i < expected.length; i++) {
+      mismatch |= expected.charCodeAt(i) ^ signatureHeader.charCodeAt(i)
+    }
+    return mismatch === 0
+  } catch {
+    return false
+  }
+}
 
 const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID!
 const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN!
@@ -15,6 +57,13 @@ export async function sendSms(
   clientId: string,
   contactId?: string | null
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  // 2026-05-12 — Twilio is no longer in use. Gate behind explicit opt-in so the
+  // path stays revertable for ~7 days, then deletes in a follow-up PR.
+  // Default OFF — any caller that needs to keep working must set TWILIO_ENABLED=1.
+  if (process.env.TWILIO_ENABLED !== '1') {
+    return { success: false, error: 'Twilio disabled (TWILIO_ENABLED!=1)' }
+  }
+
   const normalizedTo = normalizePhone(to)
   if (!normalizedTo) return { success: false, error: 'Invalid phone number' }
 

@@ -88,6 +88,18 @@ export async function GET(req: NextRequest) {
             .update({ current_step: nextStepNum, next_step_at: nextAt.toISOString() })
             .eq('id', enrollment.id);
         } else if (step.step_type === 'sms' || step.step_type === 'whatsapp') {
+          // 2026-05-12 — Twilio no longer in use. SMS/WhatsApp sequence steps
+          // can't execute. Cancel the enrollment with a clear reason rather
+          // than failing silently or retrying forever. Re-enable by setting
+          // TWILIO_ENABLED=1 in Vercel env (and re-provisioning Twilio creds).
+          if (process.env.TWILIO_ENABLED !== '1') {
+            await supabase
+              .from('sequence_enrollments')
+              .update({ status: 'cancelled', metadata: { reason: 'twilio_disabled', step_type: step.step_type } })
+              .eq('id', enrollment.id);
+            console.warn(`[sequence-executor] cancelled enrollment ${enrollment.id} — TWILIO_ENABLED!=1, step_type=${step.step_type}`);
+            continue;
+          }
           // Get client config for business name
           const { data: config } = await supabase
             .from('agent_config')

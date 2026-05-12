@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: NextRequest) {
+  // 2026-05-12 — Twilio no longer in use. Hard-gate before any auth work.
+  if (process.env.TWILIO_ENABLED !== '1') {
+    return NextResponse.json(
+      { error: 'SMS is currently disabled' },
+      { status: 410 },
+    )
+  }
+
   // Auth check
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
