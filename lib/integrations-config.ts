@@ -599,6 +599,69 @@ const CURATED_PROVIDERS: ProviderConfig[] = [
     },
   },
 
+  // ═══ HeyReach — LinkedIn outreach add-on ═══
+  {
+    // HeyReach handles the LinkedIn flows Composio's API doesn't expose:
+    // connection requests, autonomous engagement on prospect posts, message
+    // inbox. The AI Employee orchestrates via HeyReach's MCP server (official
+    // Claude integration). The owner connects their LinkedIn inside HeyReach
+    // (once), then sequences run on warmed cloud sessions — much lower ban
+    // risk than DIY browser automation.
+    //
+    // Cost on Nexley side: $79/mo Starter for 3 LinkedIn senders, or $199/mo
+    // Business for unlimited. We recharge each connected client.
+    //
+    // Compound credentials: API key + MCP server URL (one per HeyReach
+    // workspace). The watcher writes these to /opt/clients/{slug}/integrations/
+    // heyreach.json and run-loop.sh sources HEYREACH_API_KEY before spawning
+    // Claude Code so the HeyReach MCP server (in .mcp.json) can authenticate.
+    // HeyReach handles the LinkedIn flows Composio's API doesn't expose:
+    // connection requests, autonomous engagement on prospect posts, LinkedIn
+    // inbox. Connected via the official HeyReach remote MCP server (npx
+    // mcp-remote bridge) + direct REST fallback via X-API-KEY.
+    //
+    // Backend ready 2026-05-11:
+    //   - /api/integrations/heyreach route validates against api.heyreach.io/api/public/auth/CheckApiKey
+    //   - custom-integrations-watcher tracks 'heyreach' + auto-restarts claude-whatsapp on connect
+    //   - run-loop.sh sources HEYREACH_API_KEY + HEYREACH_MCP_URL before spawning Claude Code
+    //   - .mcp.json template includes `heyreach` MCP server entry with env-var expansion
+    //   - linkedin-strategy.md skill documents tools + warming schedule + fallback REST
+    //
+    // Cost: $59-79/sender/mo (HeyReach Growth plan, per-sender pricing).
+    id: 'heyreach',
+    name: 'HeyReach — LinkedIn outreach',
+    description: 'LinkedIn connection requests, prospect engagement, and inbox replies on autopilot',
+    category: 'marketing',
+    iconColor: 'bg-muted text-muted-foreground',
+    iconUrl: '/integrations/heyreach.svg',
+    available: true,
+    recommendedForTrades: false,
+    compoundPat: {
+      validateEndpoint: '/api/integrations/heyreach',
+      // Points at the HeyReach Integrations + API collection — covers API-key,
+      // MCP-server, and webhook setup all in one place. Linked from the
+      // "How do I get these?" link at the top of the modal.
+      helpUrl: 'https://help.heyreach.io/en/collections/10421873-integrations-api',
+      fields: [
+        {
+          key: 'apiKey',
+          label: 'HeyReach API key',
+          placeholder: 'Paste the value from HeyReach',
+          type: 'password',
+          helpText: 'Need a HeyReach account first — sign up at heyreach.io (Growth plan, 1 sender) and connect your LinkedIn inside HeyReach. Then: open Integrations & API → HeyReach API → "Create new API key" → name it Nexley → paste the value here. Full walkthrough at the "How do I get these?" link above.',
+        },
+        {
+          key: 'mcpUrl',
+          label: 'HeyReach MCP URL',
+          placeholder: 'https://api.heyreach.io/mcp/...',
+          type: 'url',
+          validate: 'url',
+          helpText: 'On the same Integrations & API page in HeyReach: open the HeyReach MCP Server section → "New MCP Key" → name it Nexley → copy the URL (starts with https://api.heyreach.io/mcp/).',
+        },
+      ],
+    },
+  },
+
   // ═══ File Storage — iCloud Bridge ═══
   {
     // iCloud Bridge — read/write the customer's iCloud Drive, Photos, Notes, and

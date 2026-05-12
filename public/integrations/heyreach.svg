@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="heyreach-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF8A65"/>
+      <stop offset="100%" stop-color="#F4511E"/>
+    </linearGradient>
+  </defs>
+  <!-- No background rect — icon is transparent so it adapts to light + dark dashboard themes -->
+  <g transform="translate(32 32)">
+    <!-- Outer ripple rings (outreach reaching out) -->
+    <circle cx="0" cy="0" r="26" fill="none" stroke="url(#heyreach-grad)" stroke-width="2" opacity="0.25"/>
+    <circle cx="0" cy="0" r="19" fill="none" stroke="url(#heyreach-grad)" stroke-width="2.5" opacity="0.5"/>
+    <circle cx="0" cy="0" r="12" fill="none" stroke="url(#heyreach-grad)" stroke-width="3" opacity="0.8"/>
+    <!-- Central node (the owner) -->
+    <circle cx="0" cy="0" r="6" fill="url(#heyreach-grad)"/>
+    <!-- Prospect nodes — sized so they remain visible at 32px display (radius 4 on 64-viewBox = 4px at 32px display) -->
+    <circle cx="-18" cy="-12" r="4" fill="url(#heyreach-grad)"/>
+    <circle cx="20" cy="-10" r="4" fill="url(#heyreach-grad)"/>
+    <circle cx="-16" cy="18" r="4" fill="url(#heyreach-grad)"/>
+    <circle cx="18" cy="17" r="4" fill="url(#heyreach-grad)"/>
+  </g>
+</svg>
