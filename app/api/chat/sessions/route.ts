@@ -20,7 +20,15 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const explicit = url.searchParams.get('client') || undefined;
-  const { clientId, isAdminOverride } = resolveClientId(user, explicit);
+  // 2026-05-12 (DA-R5 parity gap) — F8 spoof parity with sessions/[id]:
+  // non-admin caller passing cross-tenant client_id silently fell back to
+  // their own client and returned an empty list. Functionally low-risk (RLS
+  // scoped reads anyway), but inconsistent with the single-id route which
+  // 403s on spoof. Now uniformly 403.
+  const { clientId, isAdminOverride, spoofRejected } = resolveClientId(user, explicit);
+  if (spoofRejected) {
+    return NextResponse.json({ error: 'client_id override is admin-only' }, { status: 403 });
+  }
   if (!clientId) return NextResponse.json({ sessions: [] });
 
   const reader = isAdminOverride
@@ -72,7 +80,11 @@ export async function POST(req: Request) {
     // ignore — default title, no explicit
   }
 
-  const { clientId, isAdminOverride } = resolveClientId(user, explicit);
+  // 2026-05-12 (DA-R5 parity gap) — same fix on POST.
+  const { clientId, isAdminOverride, spoofRejected } = resolveClientId(user, explicit);
+  if (spoofRejected) {
+    return NextResponse.json({ error: 'client_id override is admin-only' }, { status: 403 });
+  }
   if (!clientId) return NextResponse.json({ error: 'no client' }, { status: 400 });
 
   const writer = isAdminOverride
