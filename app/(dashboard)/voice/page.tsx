@@ -1,5 +1,5 @@
 /**
- * /voice — admin voice channel (push-to-talk to Sage).
+ * /voice — admin voice channel (push-to-talk to Nexley).
  *
  * Gating happens server-side on the token endpoint (/api/voice/token). The
  * page itself renders for any authenticated user; the connect attempt fails
@@ -76,7 +76,7 @@ export default function VoicePage() {
   return (
     <PageShell>
       <p className="text-zinc-300 text-sm mb-6">
-        Push to talk to Sage. End the session by clicking End or closing this tab.
+        Push to talk to Nexley. End the session by clicking End or closing this tab.
         Audio is processed live via the admin VPS — text channels (WhatsApp +
         dashboard chat) are unaffected.
       </p>
@@ -87,7 +87,7 @@ export default function VoicePage() {
           onClick={requestToken}
           className="px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
         >
-          Talk to Sage
+          Talk to Nexley
         </button>
       )}
 
@@ -189,7 +189,7 @@ function ActiveSession() {
       </div>
 
       <p className="text-zinc-500 text-xs">
-        Tip: if Sage isn&apos;t responding, check that the browser tab has microphone permission.
+        Tip: if Nexley isn&apos;t responding, check that the browser tab has microphone permission.
       </p>
     </div>
   );
@@ -208,7 +208,7 @@ function stateLabel(state: ConnectionState): string {
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <main className="max-w-2xl mx-auto px-6 py-12">
-      <h1 className="text-2xl font-semibold text-white mb-2">Talk to Sage</h1>
+      <h1 className="text-2xl font-semibold text-white mb-2">Talk to Nexley</h1>
       <p className="text-zinc-500 text-sm mb-8">Admin-only voice channel.</p>
       {children}
     </main>
